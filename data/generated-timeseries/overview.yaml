@@ -1,0 +1,24 @@
+generated-timeseries:
+- anomalies:
+  - kinds:
+    - kind: pattern
+      sinusoid_k: 10.0
+    length: 50
+    position: middle
+  - kinds:
+    - amplitude_factor: 1.5
+      kind: amplitude
+    length: 10
+    position: middle
+  base-oscillations:
+  - amplitude: 1.0
+    frequency: 4.0
+    kind: sine
+    variance: 0.05
+  generation-id: 0
+  length: 1000
+  name: demo
+meta:
+  download_link: https://gitlab.hpi.de/akita/guten-tag
+  git_commit_sha: null
+  seed: 42
