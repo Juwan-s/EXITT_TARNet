@@ -1,0 +1,8 @@
+dataset,rmse,mdl_name
+AppliancesEnergy,2.527931487006091,AppliancesEnergy_50_0.001_2_64_8_2.528.mdl
+LiveFuelMoistureContent,41.35838329940648,LiveFuelMoistureContent_128_0.01_2_64_8_41.358.mdl
+IEEEPPG,30.20010978224045,IEEEPPG_64_0.01_2_64_8_30.200.mdl
+FloodModeling1,0.017756577009967,FloodModeling1_64_0.01_2_64_8_0.018.mdl
+BenzeneConcentration,1.5847464914085976,BenzeneConcentration_128_0.001_2_64_8_1.585.mdl
+Covid3Month,0.0434640359055234,Covid3Month_32_0.001_2_64_8_0.043.mdl
+BeijingPM10Quality,99.11039358809701,BeijingPM10Quality_128_0.01_2_64_8_99.110.mdl
