@@ -28,11 +28,11 @@ This process utilizes the pre-trained model files(`check_points`) provided by th
 
 1. available $XAI_methods
     - EXITT
-    - GB(Guided Backprop)
-    - GI(Gradient X Input)
+    - GB (Guided Backprop)
+    - GI (Gradient X Input)
     - Saliency
     - DeepLift
-    - DeepShap
+    - DeepLiftShap
     - Attention Last
     - Rollout
 
