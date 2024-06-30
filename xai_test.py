@@ -38,8 +38,10 @@ parser.add_argument('--task_type', type=str, default='classification', help='[cl
 parser.add_argument('--detach_mode', type=str, default='no', help='[yes, no]')
 parser.add_argument('--device', type=str, default='cuda:0', help='[cuda or cpu]')
 parser.add_argument('--model_path', type=str, default='./check_points/ECG200_16_0.0001_3_256_0.89.mdl', help='model path')
-parser.add_argument('--xai_method', type=str, default='GI', help='[GI, DeepLift, Saliency, LRP]')
+parser.add_argument('--xai_method', type=str, default='GI', help='[GI, DeepLift, Saliency, EXITT]')
 parser.add_argument('--top_percent', type=int, default=90)
+parser.add_argument('--eval_method', type=str, default='zero', help='[zero, inverse, mean]')
+
 
 args = parser.parse_args()
 
@@ -74,7 +76,7 @@ class moving_avg(nn.Module):
         return x
 
 
-class LRP:
+class EXITT:
 
     def __init__(self, model, task_type):
         self.model = model
@@ -126,7 +128,7 @@ prop['dataset'], prop['seq_len'], prop['input_size'] = prop['dataset'], X_train_
 #  Load model
 #  ====================================================================================================
 
-if prop['xai_method'] == 'LRP':
+if prop['xai_method'] == 'EXITT':
     prop['detach_mode'] = 'yes'
 else:
     prop['detach_mode'] = 'no'
@@ -138,7 +140,7 @@ model_path = prop['model_path']
 chkpt = torch.load(model_path)
 best_model.load_state_dict(chkpt)
 
-xai_dict = {'LRP': LRP,
+xai_dict = {'EXITT': EXITT,
            'Saliency': Saliency,
            'GI': InputXGradient,
            'DeepLift':DeepLift,
@@ -177,11 +179,11 @@ def evaluate(y_pred, y, nclasses, criterion, task_type, device, avg):
 
 
 def perturb_zero(model, X, y, batch, nclasses, xai_method_1, criterion, task_type, device, avg, top_percent):
-    # if xai_method_1 != 'LRP':
+    # if xai_method_1 != 'EXITT':
     model.eval()
     num_batches = math.ceil(X.shape[0] / batch)  # 7
     
-    if xai_method_1 == 'LRP' or xai_method_1 == 'Random':
+    if xai_method_1 == 'EXITT' or xai_method_1 == 'Random':
         xai_method = xai_dict[xai_method_1](model, task_type)
     else:
         xai_method = xai_dict[xai_method_1](model)
@@ -207,7 +209,7 @@ def perturb_zero(model, X, y, batch, nclasses, xai_method_1, criterion, task_typ
                 relevance_scores = xai_method.attribute(input_x, target = input_y, additional_forward_args=task_type, n_steps = 10)
             elif xai_method_1 == 'Shap':
                 relevance_scores = xai_method.attribute(input_x, target = input_y, additional_forward_args=task_type, n_samples = 10)
-            elif xai_method_1 != 'LRP' and  xai_method_1 != 'Random':
+            elif xai_method_1 != 'EXITT' and  xai_method_1 != 'Random':
                 relevance_scores = xai_method.attribute(input_x, target = input_y, additional_forward_args=task_type)
             else:
                 relevance_scores = xai_method.attribute(input_x, target = input_y)
@@ -222,7 +224,7 @@ def perturb_zero(model, X, y, batch, nclasses, xai_method_1, criterion, task_typ
                 relevance_scores = xai_method.attribute(input_x, additional_forward_args=task_type, n_steps = 10)
             elif xai_method_1 == 'Shap':
                 relevance_scores = xai_method.attribute(input_x, additional_forward_args=task_type, n_samples = 10)
-            elif xai_method_1 != 'LRP' and  xai_method_1 != 'Random':
+            elif xai_method_1 != 'EXITT' and  xai_method_1 != 'Random':
                 relevance_scores = xai_method.attribute(input_x, additional_forward_args=task_type)
             else:
                 relevance_scores = xai_method.attribute(input_x, target=input_y)
@@ -303,8 +305,102 @@ def perturb_zero_random(model, X, y, batch, nclasses, xai_method_1, criterion, t
     return test_metrics
 
 
-
 def perturb_mean(model, X, y, batch, nclasses, xai_method_1, criterion, task_type, device, avg, top_percent):
+    # if xai_method_1 != 'EXITT':
+    model.eval()
+    num_batches = math.ceil(X.shape[0] / batch)  # 7
+    
+    if xai_method_1 == 'EXITT' or xai_method_1 == 'Random':
+        xai_method = xai_dict[xai_method_1](model, task_type)
+    else:
+        xai_method = xai_dict[xai_method_1](model)
+    output_arr = []
+
+    for i in tqdm(range(num_batches)):
+        start = int(i * batch)
+        end = int((i + 1) * batch)
+
+        num_inst = y[start : end].shape[0]
+
+        input_x = torch.as_tensor(X[start : start + num_inst], device = device)
+        input_y = torch.as_tensor(y[start : start + num_inst], device = device)
+        
+        mean_val = torch.mean(input_x, dim =1).detach().cpu()
+        mean_val = mean_val.unsqueeze(1).expand(-1, input_x.shape[1], -1)
+
+        if (input_x != input_x).sum() != 0:
+            print('input_x nan')
+        
+
+        if task_type == 'classification':
+            if xai_method_1 == 'GradientShap' or xai_method_1 == 'DeepLiftShap':
+                relevance_scores = xai_method.attribute(input_x, target = input_y, additional_forward_args=[task_type], baselines = torch.zeros_like(input_x))
+            elif xai_method_1 == 'IG':
+                relevance_scores = xai_method.attribute(input_x, target = input_y, additional_forward_args=task_type, n_steps = 10)
+            elif xai_method_1 == 'Shap':
+                relevance_scores = xai_method.attribute(input_x, target = input_y, additional_forward_args=task_type, n_samples = 10)
+            elif xai_method_1 != 'EXITT' and  xai_method_1 != 'Random':
+                relevance_scores = xai_method.attribute(input_x, target = input_y, additional_forward_args=task_type)
+            else:
+                relevance_scores = xai_method.attribute(input_x, target = input_y)
+            try:
+                relevance_scores = relevance_scores.detach().cpu()
+            except:
+                relevance_scores = relevance_scores.numpy()
+        else:
+            if xai_method_1 == 'GradientShap' or xai_method_1 == 'DeepLiftShap':
+                relevance_scores = xai_method.attribute(input_x, additional_forward_args=[task_type], baselines = torch.zeros_like(input_x))
+            elif xai_method_1 == 'IG':
+                relevance_scores = xai_method.attribute(input_x, additional_forward_args=task_type, n_steps = 10)
+            elif xai_method_1 == 'Shap':
+                relevance_scores = xai_method.attribute(input_x, additional_forward_args=task_type, n_samples = 10)
+            elif xai_method_1 != 'EXITT' and  xai_method_1 != 'Random':
+                relevance_scores = xai_method.attribute(input_x, additional_forward_args=task_type)
+            else:
+                relevance_scores = xai_method.attribute(input_x, target=input_y)
+            try:
+                relevance_scores = relevance_scores.detach().cpu()
+            except:
+                relevance_scores = relevance_scores.numpy()
+        # relevance_scores = mv(relevance_scores)
+        
+        percentiles = np.percentile(relevance_scores.numpy(), q=top_percent, axis=1)
+        percentiles = torch.from_numpy(percentiles)
+        mask = torch.from_numpy(np.where(relevance_scores > percentiles[:, np.newaxis], 0, 1))
+
+        x_perturbed = torch.from_numpy(np.where(mask == 1, mean_val, input_x.detach().cpu())).to(device)
+        out = model(x_perturbed, task_type)
+        # if (x_perturbed != x_perturbed).sum() != 0:
+        #     print('nan check 0')
+
+        # print("Perturbed model input start......")
+        # out = model(x_perturbed, task_type)
+        # print("Perturbed model input ended......")
+        x_perturbed = x_perturbed.detach().cpu()
+        input_x = input_x.detach().cpu()
+        mask = mask.detach().cpu()
+        input_y = input_y.detach().cpu()
+        
+        del input_x
+        del mask
+        del input_y
+        del x_perturbed
+        out = out.detach().cpu()
+        torch.cuda.empty_cache()
+        output_arr.append(out[ : num_inst])
+        # out = out.detach().cpu()
+        del out
+
+        if (torch.cat(output_arr, 0) != torch.cat(output_arr, 0)).sum() != 0:
+            print("nan check 2")
+
+    with torch.no_grad():
+        
+        test_metrics = evaluate(torch.cat(output_arr, 0), y, nclasses, criterion, task_type, device, avg)
+
+    return test_metrics
+
+def _perturb_mean(model, X, y, batch, nclasses, xai_method_1, criterion, task_type, device, avg, top_percent):
 
     model.eval() # Turn on the evaluation mode
     num_batches = math.ceil(X.shape[0] / batch)  # 7
@@ -327,7 +423,7 @@ def perturb_mean(model, X, y, batch, nclasses, xai_method_1, criterion, task_typ
         mean_val = mean_val.unsqueeze(1).expand(-1, input_x.shape[1], -1)
 
 
-        if xai_method_1 != 'LRP':
+        if xai_method_1 != 'EXITT':
             relevance_scores = xai_method.attribute(input_x, target = input_y,  additional_forward_args='classification')
         else:
             relevance_scores = xai_method.attribute(input_x, target = input_y)
@@ -374,7 +470,7 @@ def perturb_inverse(model, X, y, batch, nclasses, xai_method_1, criterion, task_
         max_val = torch.max(input_x, dim =1).values.detach().cpu()
         max_val = max_val.unsqueeze(1).expand(-1, input_x.shape[1], -1)
 
-        if xai_method_1 != 'LRP':
+        if xai_method_1 != 'EXITT':
             relevance_scores = xai_method.attribute(input_x, target = input_y,  additional_forward_args='classification')
         else:
             relevance_scores = xai_method.attribute(input_x, target = input_y)
@@ -400,7 +496,12 @@ top_percent = prop['top_percent']
 
 print(prop['dataset'])
 
-res_zero = perturb_zero(best_model, X_test, y_test, prop['batch'], prop['nclasses'], prop['xai_method'], criterion_task, prop['task_type'], prop['device'], prop['avg'], top_percent)
+if prop['eval_method'] == 'zero':
+    xai_res = perturb_zero(best_model, X_test, y_test, prop['batch'], prop['nclasses'], prop['xai_method'], criterion_task, prop['task_type'], prop['device'], prop['avg'], top_percent)
+elif prop['eval_method'] == 'inverse':
+    xai_res = perturb_zero(best_model, X_test, y_test, prop['batch'], prop['nclasses'], prop['xai_method'], criterion_task, prop['task_type'], prop['device'], prop['avg'], top_percent)
+elif prop['eval_method'] == 'mean':
+    xai_res = perturb_mean(best_model, X_test, y_test, prop['batch'], prop['nclasses'], prop['xai_method'], criterion_task, prop['task_type'], prop['device'], prop['avg'], top_percent)
 
 # print("Accuracy :", res_zero[1], "F1 :", res_zero[-1])
 
@@ -417,29 +518,29 @@ res_zero = perturb_zero(best_model, X_test, y_test, prop['batch'], prop['nclasse
 
 
 if prop['task_type'] == 'classification':
-    print("Accuracy :", res_zero[1], "F1 :", res_zero[-1])
+    print("Accuracy :", xai_res[1], "F1 :", xai_res[-1])
 
     df = pd.DataFrame()
 
     # res_avg = (res_zero[1] + res_mean[1] + res_inv[1]) / 3
 
-    temp = {'val': {'Acc': res_zero[1], 'F1': res_zero[-1]}}
+    temp = {'val': {'Acc': xai_res[1], 'F1': xai_res[-1]}}
 
     df = pd.DataFrame(temp)
 
     # df.to_csv('./results/' + prop['dataset'] + '_' + prop['xai_method'] + '.csv')
-    df.to_csv('./results/' + prop['dataset'] + '_' + str(prop['top_percent']) + '_' + prop['xai_method'] + '.csv')
+    df.to_csv('./results/' + prop['dataset'] + '_' + str(prop['top_percent']) + '_' + prop['xai_method'] + '_' + prop['eval_method'] + '.csv')
 
 elif prop['task_type'] == 'regression':
-    print("RMSE :", res_zero[0], "MAE :", res_zero[-1])
+    print("RMSE :", xai_res[0], "MAE :", xai_res[-1])
 
     df = pd.DataFrame()
 
     # res_avg = (res_zero[1] + res_mean[1] + res_inv[1]) / 3
 
-    temp = {'val': {'RMSE': res_zero[0], 'MAE': res_zero[-1]}}
+    temp = {'val': {'RMSE': xai_res[0], 'MAE': xai_res[-1]}}
 
     df = pd.DataFrame(temp)
 
     # df.to_csv('./results/' + prop['dataset'] + '_' + prop['xai_method'] + '.csv')
-    df.to_csv('./results/' + prop['dataset'] + '_' + str(prop['top_percent']) + '_' + prop['xai_method'] + '.csv')
+    df.to_csv('./results/' + prop['dataset'] + '_' + str(prop['top_percent']) + '_' + prop['xai_method'] + '_' + prop['eval_method'] + '.csv')
