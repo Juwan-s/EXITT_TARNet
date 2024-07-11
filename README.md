@@ -53,3 +53,22 @@ Refer to `hyperparameters.pkl` for the model hyperparameters used in our experim
 - example
 
 ```python3 script.py --dataset Adiac --task_type classification --batch 4 --lr 1e-4 --nlayers 2 --emb_size 64 --masking_ratio 0.50 --task_rate 0.15 --detach_mode no --device cuda:0```
+
+
+<hr>
+
+<h1> Experimental results </h1>
+
+For more information about the experiment and to see the statistical significance, please refer to the **results** folder in this repository.
+
+<h2> Univariate Classification Performance Degradation </h2>
+
+![alt text](./materials/univariate.png)
+
+<h2> Multivariate Classification Performance Degradation </h2>
+
+![alt text](./materials/multivariate.png)
+
+<h2> Regression Classification Performance Degradation </h2>
+
+![alt text](./materials/regression.png)
