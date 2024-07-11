@@ -2,7 +2,7 @@
 
 <hr>
 
-This repository contains the official source code for the "EXIT$^{2}$ : **EX**plainability **I**n **T**ime-series **T**ransformer" paper.
+This repository contains the official source code for the "EXIT<sup>2</sup> : **EX**plainability **I**n **T**ime-series **T**ransformer" paper.
 
 
 <h1> Requirements </h1>
