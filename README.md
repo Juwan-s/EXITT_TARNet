@@ -59,7 +59,7 @@ Refer to `hyperparameters.pkl` for the model hyperparameters used in our experim
 
 <h1> Experimental results </h1>
 
-For more information about the experiment and to see the statistical significance, please refer to the **results** folder in this repository.
+For more information about the experiment and to see the statistical significance, please refer to the ```results``` folder in this repository.
 
 <h2> Univariate Classification Performance Degradation </h2>
 
